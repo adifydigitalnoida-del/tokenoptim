@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-left">
+        <h1>TokenOptim</h1>
+        <span class="accuracy-badge" id="accuracy-badge">~Est</span>
+      </div>
+      <button id="settings-btn" class="settings-btn">⚙️</button>
+    </div>
+
+    <!-- Cost Estimates -->
+    <div class="cost-section">
+      <div class="cost-card">
+        <span class="cost-label">Today's Est.</span>
+        <span class="cost-value" id="cost-today">$0.00</span>
+      </div>
+      <div class="cost-card">
+        <span class="cost-label">Weekly Proj.</span>
+        <span class="cost-value" id="cost-weekly">$0.00</span>
+      </div>
+    </div>
+
+    <!-- Savings Stats -->
+    <div class="stats-section">
+      <div class="stat-card">
+        <div class="stat-label">Tokens Saved</div>
+        <div class="stat-value" id="saved-today">0</div>
+        <div class="stat-subtext" id="saved-money">Save $0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Reduction %</div>
+        <div class="stat-value" id="reduction-percent">0%</div>
+        <div class="stat-subtext">vs original</div>
+      </div>
+    </div>
+
+    <!-- Compression Preview -->
+    <div class="compression-section">
+      <div class="compression-header">
+        <label class="toggle-label">
+          <input type="checkbox" id="compression-toggle" checked>
+          <span class="toggle-text">Auto-Compress</span>
+        </label>
+        <span class="mode-indicator" id="mode-indicator">Sentence-level</span>
+      </div>
+      <button id="compress-btn" class="compress-btn">Preview Compression</button>
+      
+      <div id="preview-panel" class="preview-panel hidden">
+        <div class="preview-item">
+          <span class="preview-label">Original</span>
+          <div class="preview-text" id="preview-original"></div>
+          <span class="preview-meta" id="preview-original-tokens"></span>
+        </div>
+        <div class="preview-arrow">→</div>
+        <div class="preview-item">
+          <span class="preview-label">Compressed</span>
+          <div class="preview-text" id="preview-compressed"></div>
+          <span class="preview-meta" id="preview-compressed-tokens"></span>
+        </div>
+      </div>
+
+      <!-- Filler Words Detection -->
+      <div id="filler-words-panel" class="filler-panel hidden">
+        <div class="filler-label">Removed Filler Words:</div>
+        <div id="filler-words-chips" class="chips-container"></div>
+      </div>
+
+      <!-- Recommendations -->
+      <div id="recommendations-panel" class="recommendations-panel hidden">
+        <div class="recommendations-label">Recommendations:</div>
+        <ul id="recommendations-list" class="recommendations-list"></ul>
+      </div>
+    </div>
+
+    <!-- AI Platform Breakdown -->
+    <div class="ai-breakdown">
+      <h3>By Platform</h3>
+      <div id="ai-list" class="ai-list">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+
+    <!-- Real-time Counter -->
+    <div class="live-counter">
+      <h3>Session Tokens</h3>
+      <div class="counter-display">
+        <div class="counter-item">
+          <span class="counter-label">Input:</span>
+          <span class="counter-value" id="input-tokens">0</span>
+          <span class="counter-subvalue" id="input-accuracy"></span>
+        </div>
+        <div class="counter-item">
+          <span class="counter-label">Output:</span>
+          <span class="counter-value" id="output-tokens">0</span>
+          <span class="counter-subvalue" id="output-accuracy"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cache Stats -->
+    <div class="cache-section">
+      <h3>Cache & Storage</h3>
+      <div class="cache-stats">
+        <span id="cache-size">0 MB</span>
+        <button id="clear-cache-btn" class="clear-btn">Clear Cache</button>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div class="export-section">
+      <button id="export-btn" class="export-btn">Export Stats (CSV)</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

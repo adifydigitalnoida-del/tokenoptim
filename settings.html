@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="settings-container">
+    <h1>TokenOptim Settings</h1>
+
+    <div class="settings-section">
+      <h2>Compression</h2>
+      <label class="setting-item">
+        <input type="checkbox" id="compression-enabled" checked>
+        <span class="setting-label">Enable automatic compression</span>
+      </label>
+      <label class="setting-item">
+        <input type="checkbox" id="cache-enabled" checked>
+        <span class="setting-label">Enable response caching</span>
+      </label>
+    </div>
+
+    <div class="settings-section">
+      <h2>Supported Platforms</h2>
+      <div class="platforms">
+        <label class="platform-item">
+          <input type="checkbox" checked disabled>
+          <span>Claude</span>
+        </label>
+        <label class="platform-item">
+          <input type="checkbox" checked disabled>
+          <span>ChatGPT</span>
+        </label>
+        <label class="platform-item">
+          <input type="checkbox" checked disabled>
+          <span>Grok</span>
+        </label>
+        <label class="platform-item">
+          <input type="checkbox" checked disabled>
+          <span>Gemini</span>
+        </label>
+        <label class="platform-item">
+          <input type="checkbox" checked disabled>
+          <span>Kimi</span>
+        </label>
+        <label class="platform-item">
+          <input type="checkbox" checked disabled>
+          <span>GLM</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>Data Management</h2>
+      <button id="clear-all-btn" class="danger-btn">Clear All Data</button>
+      <button id="export-stats-btn" class="secondary-btn">Export Stats</button>
+    </div>
+
+    <div class="settings-section">
+      <h2>About</h2>
+      <div class="about-text">
+        <p><strong>TokenOptim v1.0.0</strong></p>
+        <p>AI token compression & tracking across 6 platforms</p>
+        <p>Reduces token usage by simplifying language, caching responses, and tracking usage in real-time.</p>
+      </div>
+    </div>
+
+    <div class="status-message" id="status"></div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
