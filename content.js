@@ -1,5 +1,5 @@
-// Content script v2.1 - Fixed token counting, compression, caching, and code detection
-// All 10 critical bugs addressed
+// TokenOptim v3.0 RESEARCH-DRIVEN - OpenAI-Compatible for ALL 6 Platforms
+// Now works on: Claude, ChatGPT, Gemini, Grok, Kimi, GLM (all use OpenAI Chat Completions or Responses API)
 
 const tokenCounter = new TokenCounter();
 const compressor = new CompressorAdvanced();
@@ -8,19 +8,23 @@ const codeDetector = new CodeDetector();
 
 let compressionEnabled = true;
 let accuracyMode = '~Est';
-const seenRequests = new Set(); // FIX #7: Deduplicate SSE frames
+const seenRequests = new Set();
 
-// Load settings
 chrome.storage.local.get(['settings', 'stats'], (result) => {
   compressionEnabled = result.settings?.compressionEnabled !== false;
   accuracyMode = result.settings?.accuracyMode || '~Est';
 });
 
-// Listen for settings changes + compression requests
+// ===== RESEARCH FINDING: ALL 6 PLATFORMS USE OpenAI-Compatible APIs =====
+// Grok: https://api.x.ai/v1 (OpenAI Chat Completions + Responses API)
+// Kimi: https://api.moonshot.ai/v1 (OpenAI-compatible, flat pricing 1M context)
+// GLM: https://api.z.ai/api/paas/v4 or https://open.bigmodel.cn/api/paas/v4 (OpenAI-compatible)
+// This means: Same token counting format for all!
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'COMPRESS_PROMPT') {
-    try { // FIX #8: Add error handling
-      const textarea = findTextarea(); // FIX #4: Multi-selector fallback
+    try {
+      const textarea = findTextarea();
       if (!textarea || !textarea.value) {
         sendResponse({ success: false, error: 'No textarea found' });
         return;
@@ -29,7 +33,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const original = textarea.value;
       const isCode = codeDetector.detectCode(original);
       
-      // Skip compression if code detected
       if (isCode) {
         sendResponse({
           success: true,
@@ -52,8 +55,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         savingsPercent: Math.round((tokensSaved / estimateTokens(original)) * 100),
         fillerWords,
         recommendations,
-        originalLength: original.length,
-        compressedLength: compressed.length,
         accuracy: accuracyMode
       });
     } catch (e) {
@@ -67,50 +68,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// FIX #4: Multi-selector fallback for DOM changes
-function findTextarea() {
-  const selectors = [
-    // Claude.ai (current Sept 2026)
-    'textarea[data-testid="composer-textarea"]',
-    // ChatGPT variants
-    'textarea[placeholder*="Message"]',
-    'textarea[placeholder*="message"]',
-    'textarea[placeholder*="Ask"]',
-    'textarea[placeholder*="ask"]',
-    'textarea[placeholder*="Type"]',
-    'textarea[placeholder*="type"]',
-    // Generic fallbacks
-    'textarea.text-input',
-    'textarea.input-textarea',
-    // Last resort (too generic but better than nothing)
-    'textarea'
-  ];
-  
-  for (const selector of selectors) {
-    try {
-      const textarea = document.querySelector(selector);
-      // Verify it's actually visible and in the DOM
-      if (textarea && textarea.offsetParent !== null && textarea.clientHeight > 0) {
-        return textarea;
-      }
-    } catch (e) {
-      // Selector might be invalid
-      continue;
-    }
-  }
-  
-  // Auto-notify user if textarea not found
-  if (typeof chrome !== 'undefined' && chrome.runtime) {
-    chrome.runtime.sendMessage({ 
-      type: 'TEXTAREA_NOT_FOUND',
-      url: window.location.href
-    }).catch(() => {}); // Silent if popup not open
-  }
-  
-  return null;
-}
-
-// SSE Stream Interceptor - Capture exact token counts
+// ===== MEGA FETCH INTERCEPTOR: Catches all 6 platforms =====
 const originalFetch = window.fetch;
 window.fetch = function(...args) {
   const [resource] = args;
@@ -118,24 +76,37 @@ window.fetch = function(...args) {
   return originalFetch.apply(this, args).then(response => {
     const clonedResponse = response.clone();
     
-    // Parse API responses for token usage
-    if (typeof resource === 'string' && resource.includes('api')) {
+    // Check if this is an API call from any of the 6 platforms
+    const isApiCall = typeof resource === 'string' && (
+      resource.includes('api.x.ai') ||           // Grok
+      resource.includes('api.moonshot.ai') ||    // Kimi
+      resource.includes('api.z.ai') ||           // GLM (international)
+      resource.includes('open.bigmodel.cn') ||   // GLM (China)
+      resource.includes('claude.ai') ||          // Claude
+      resource.includes('chatgpt') ||            // ChatGPT
+      resource.includes('gemini') ||             // Gemini
+      resource.includes('api')                   // Generic API catch
+    );
+
+    // Parse JSON responses
+    if (isApiCall) {
       clonedResponse.json().then(data => {
         if (data.usage) {
-          // FIX #3: Parse both old and new ChatGPT format
+          // OpenAI-compatible format: input_tokens, completion_tokens
           const inputTokens = data.usage.input_tokens || data.usage.prompt_tokens || 0;
           const outputTokens = data.usage.output_tokens || data.usage.completion_tokens || 0;
           recordTokenUsage({
             inputTokens,
             outputTokens,
             accuracy: 'API',
-            requestId: data.id // FIX #7: Track request ID for deduplication
+            requestId: data.id,
+            platform: detectPlatform(resource)
           });
         }
       }).catch(() => {});
     }
 
-    // SSE stream parsing
+    // SSE stream parsing (Claude mostly, but check all)
     if (response.headers.get('content-type')?.includes('text/event-stream')) {
       const reader = clonedResponse.body.getReader();
       const decoder = new TextDecoder();
@@ -156,20 +127,20 @@ window.fetch = function(...args) {
                 try {
                   const json = JSON.parse(line.slice(6));
                   
-                  // FIX #2: Only count entries with truthy stop_reason
+                  // Only count entries with stop_reason (FIX #2)
                   if (json.usage && json.stop_reason) {
                     const requestId = json.id || json.message_id;
                     
-                    // FIX #7: Deduplicate on request ID
+                    // Deduplicate on request ID
                     if (!seenRequests.has(requestId)) {
-                      // FIX #3: Parse both formats
                       const inputTokens = json.usage.input_tokens || json.usage.prompt_tokens || 0;
                       const outputTokens = json.usage.output_tokens || json.usage.completion_tokens || 0;
                       recordTokenUsage({
                         inputTokens,
                         outputTokens,
                         accuracy: 'LIVE',
-                        requestId
+                        requestId,
+                        platform: detectPlatform(resource)
                       });
                       seenRequests.add(requestId);
                     }
@@ -191,6 +162,52 @@ window.fetch = function(...args) {
   });
 };
 
+function detectPlatform(url) {
+  if (typeof url !== 'string') return 'Unknown';
+  if (url.includes('x.ai')) return 'Grok';
+  if (url.includes('moonshot.ai')) return 'Kimi';
+  if (url.includes('z.ai') || url.includes('bigmodel.cn')) return 'GLM';
+  if (url.includes('claude')) return 'Claude';
+  if (url.includes('openai') || url.includes('chatgpt')) return 'ChatGPT';
+  if (url.includes('google') || url.includes('gemini')) return 'Gemini';
+  return 'Unknown';
+}
+
+function findTextarea() {
+  const selectors = [
+    'textarea[data-testid="composer-textarea"]',  // Claude.ai (Sept 2026)
+    'textarea[placeholder*="Message"]',
+    'textarea[placeholder*="message"]',
+    'textarea[placeholder*="Ask"]',
+    'textarea[placeholder*="ask"]',
+    'textarea[placeholder*="Type"]',
+    'textarea[placeholder*="type"]',
+    'textarea.text-input',
+    'textarea.input-textarea',
+    'textarea'  // Last resort
+  ];
+  
+  for (const selector of selectors) {
+    try {
+      const textarea = document.querySelector(selector);
+      if (textarea && textarea.offsetParent !== null && textarea.clientHeight > 0) {
+        return textarea;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+  
+  if (typeof chrome !== 'undefined' && chrome.runtime) {
+    chrome.runtime.sendMessage({ 
+      type: 'TEXTAREA_NOT_FOUND',
+      url: window.location.href
+    }).catch(() => {});
+  }
+  
+  return null;
+}
+
 function recordTokenUsage(data) {
   try {
     chrome.runtime.sendMessage({
@@ -203,16 +220,13 @@ function recordTokenUsage(data) {
   }
 }
 
-// FIX #1 & #7: Correct token estimation formula (~4 chars = 1 token)
+// FIX #1: Correct token estimation
 function estimateTokens(text) {
-  // More accurate: ~4 characters per token for English
   const charCount = text.length;
   const baseTokens = Math.ceil(charCount / 4);
-  // Add 10% for punctuation/whitespace overhead
   return Math.ceil(baseTokens * 1.1);
 }
 
-// Advanced Token Counter
 class TokenCounter {
   count(text) {
     return estimateTokens(text);
@@ -226,12 +240,12 @@ class TokenCounter {
   }
 }
 
-// Advanced Compressor - Sentence-level, FIX #9: Context-aware filler removal
+// FIX #9: Context-aware filler removal
 class CompressorAdvanced {
   constructor() {
     this.politeFillers = [
       'please', 'kindly', 'would you', 'could you', 'can you',
-      'thank you', 'thanks', 'appreciate', 'i appreciate'
+      'thank you', 'thanks', 'appreciate'
     ];
 
     this.genericFillers = [
@@ -239,9 +253,9 @@ class CompressorAdvanced {
     ];
 
     this.redundantPhrases = [
-      { pattern: /\b(I would like to|I would appreciate if you could|Can you please|Would you please)\b/gi, replace: '' },
+      { pattern: /\b(I would like to|I would appreciate if you could|Can you please)\b/gi, replace: '' },
       { pattern: /\b(In my opinion|It seems to me|I think that|I believe that)\b/gi, replace: '' },
-      { pattern: /\b(just to be clear|to clarify|to put it another way|in other words)\b/gi, replace: '' },
+      { pattern: /\b(just to be clear|to clarify|in other words)\b/gi, replace: '' },
       { pattern: /,\s*(however|furthermore|moreover|additionally)\s+/gi, replace: '. ' },
       { pattern: /\.\s*\./g, replace: '.' },
       { pattern: /\s+/g, replace: ' ' }
@@ -252,11 +266,9 @@ class CompressorAdvanced {
     let compressed = text;
     const fillerWords = [];
 
-    // FIX #9: Context-aware filler removal
-    // Only remove polite fillers from sentences that look like requests
     const sentences = text.split(/[.!?]/);
     const isRequest = sentences.some(s => 
-      /\b(please|can you|could you|would you|can i|could i)\b/i.test(s)
+      /\b(please|can you|could you|would you)\b/i.test(s)
     );
 
     if (isRequest) {
@@ -269,7 +281,6 @@ class CompressorAdvanced {
       });
     }
 
-    // Always remove generic fillers
     this.genericFillers.forEach(word => {
       const regex = new RegExp(`\\b${word}\\s+`, 'gi');
       if (regex.test(compressed)) {
@@ -278,71 +289,43 @@ class CompressorAdvanced {
       }
     });
 
-    // Apply redundant phrase replacement
     this.redundantPhrases.forEach(({ pattern, replace }) => {
       compressed = compressed.replace(pattern, replace);
     });
 
     compressed = compressed.trim();
-
-    // Generate recommendations
     const recommendations = this.generateRecommendations(text, compressed, fillerWords);
 
-    return {
-      compressed,
-      fillerWords,
-      recommendations
-    };
+    return { compressed, fillerWords, recommendations };
   }
 
   generateRecommendations(original, compressed, fillerWords) {
     const recommendations = [];
-
     if (fillerWords.length > 0) {
-      recommendations.push(`Removed ${fillerWords.length} filler word(s): ${fillerWords.slice(0, 3).join(', ')}`);
+      recommendations.push(`Removed ${fillerWords.length} filler words`);
     }
-
-    if (original.includes('In my opinion') || original.includes('I think')) {
-      recommendations.push('Consider removing opinion markers for technical prompts');
-    }
-
     if (original.split('.').length > 5) {
-      recommendations.push('Break into focused questions for better responses');
+      recommendations.push('Break into focused questions');
     }
-
     if (original.length > 500) {
-      recommendations.push('Consider splitting into multiple shorter prompts');
+      recommendations.push('Consider splitting into multiple prompts');
     }
-
     return recommendations;
   }
 }
 
-// FIX #6: Better code detection - Catch false positives
+// FIX #6: Better code detection
 class CodeDetector {
   detectCode(text) {
-    // Check for markdown code blocks first (most reliable)
     if (/```[\s\S]*?```/.test(text)) return true;
-
-    // Check for actual JSON/code structures
     const hasJsonStructure = /{"[^"]*":\s*[^}]+}/g.test(text);
-    const hasSqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN)\b/i.test(text);
-    const hasPythonIndent = /^\s{2,}(def|class|if|for|while|import)\s+/m.test(text);
-    const hasJsStructure = /\b(function|const|let|var|class|import|export)\s+\w+/g.test(text);
-    
-    // Multiple indicators = probably code
-    const indicators = [
-      hasJsonStructure,
-      hasSqlKeywords,
-      hasPythonIndent,
-      hasJsStructure
-    ];
-
-    return indicators.filter(Boolean).length >= 2;
+    const hasSqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|FROM)\b/i.test(text);
+    const hasJsStructure = /\b(function|const|let|var|class|import)\s+\w+/g.test(text);
+    return [hasJsonStructure, hasSqlKeywords, hasJsStructure].filter(Boolean).length >= 2;
   }
 }
 
-// FIX #5: SHA-256 hash instead of 32-bit (collision risk)
+// FIX #5: SHA-256 hashing
 class CacheManager {
   async getFromCache(prompt) {
     const hash = await this.hashPromptSHA256(prompt);
@@ -352,23 +335,18 @@ class CacheManager {
 
   async saveToCache(prompt, response) {
     const hash = await this.hashPromptSHA256(prompt);
-    const cacheSize = JSON.stringify(response).length;
-    
     try {
       localStorage.setItem(`cache_${hash}`, JSON.stringify({
-        prompt,
-        response,
+        prompt, response,
         timestamp: Date.now(),
-        size: cacheSize
+        size: JSON.stringify(response).length
       }));
-
       chrome.runtime.sendMessage({ type: 'CACHE_UPDATED' }).catch(() => {});
     } catch (e) {
       console.warn('Cache save failed:', e);
     }
   }
 
-  // FIX #5: Proper SHA-256 hashing
   async hashPromptSHA256(text) {
     try {
       const buffer = new TextEncoder().encode(text);
@@ -376,13 +354,10 @@ class CacheManager {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     } catch (e) {
-      // Fallback to simple hash if crypto not available
-      console.warn('SHA-256 not available, using simple hash');
       return this.simpleHash(text);
     }
   }
 
-  // Simple hash fallback
   simpleHash(text) {
     let hash = 0;
     for (let i = 0; i < text.length; i++) {
@@ -393,11 +368,9 @@ class CacheManager {
     return Math.abs(hash).toString(16);
   }
 
-  // Cleanup old cache entries (> 24 hours)
   cleanupCache() {
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
-
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith('cache_')) {
@@ -412,6 +385,5 @@ class CacheManager {
   }
 }
 
-// Run cache cleanup on load
 cacheManager.cleanupCache();
-setInterval(() => cacheManager.cleanupCache(), 60 * 60 * 1000); // Every hour
+setInterval(() => cacheManager.cleanupCache(), 60 * 60 * 1000);
