@@ -1,25 +1,29 @@
 {
   "manifest_version": 3,
-  "name": "TokenOptim - AI Token Saver",
-  "version": "1.0.0",
-  "description": "Compress prompts and track token usage across Claude, ChatGPT, Grok, Gemini, Kimi, GLM and more",
+  "name": "TokenOptim",
+  "version": "3.1.0",
+  "description": "Real-time token counting + semantic caching for Claude, ChatGPT, Gemini, Grok, Kimi, GLM. Save 60-90% on AI costs.",
   "permissions": [
-    "activeTab",
-    "scripting",
     "storage",
-    "webRequest",
-    "tabs"
+    "scripting"
   ],
   "host_permissions": [
     "https://claude.ai/*",
     "https://chatgpt.com/*",
-    "https://chat.openai.com/*",
-    "https://grok.com/*",
     "https://gemini.google.com/*",
-    "https://kimi.moonshot.cn/*",
-    "https://chatglm.cn/*",
-    "https://*/*"
+    "https://grok.com/*",
+    "https://kimi.moonshot.ai/*",
+    "https://glm.cn/*"
   ],
+  "action": {
+    "default_title": "TokenOptim - Token Counter & Caching",
+    "default_popup": "popup.html",
+    "default_icons": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -28,29 +32,18 @@
       "matches": [
         "https://claude.ai/*",
         "https://chatgpt.com/*",
-        "https://chat.openai.com/*",
-        "https://grok.com/*",
         "https://gemini.google.com/*",
-        "https://kimi.moonshot.cn/*",
-        "https://chatglm.cn/*"
+        "https://grok.com/*",
+        "https://kimi.moonshot.ai/*",
+        "https://glm.cn/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_start"
+      "run_at": "document_end"
     }
   ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "TokenOptim"
-  },
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["injected.js"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }
