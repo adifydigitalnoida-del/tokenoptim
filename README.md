@@ -166,3 +166,20 @@ Ideas for features?
 **Questions?** Open an issue or discussion.
 
 **Ready to save money on AI?** Load TokenOptim now. 🚀
+
+---
+
+## 🔥 Troubleshooting
+
+### Extension Won't Load?
+
+If you see: `Could not load icon 'icons/icon-16.png'`
+
+**Solution:** Make sure you have the latest version. The icon files are now included.
+
+```bash
+git pull origin main
+```
+
+Then reload the extension in Chrome.
+
